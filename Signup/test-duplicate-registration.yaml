@@ -1,0 +1,114 @@
+id: test-duplicate-registration
+info:
+  name: Test Duplicate Registration
+  description: Test whether duplicate registration is prevented and whether existing users can be updated
+author:
+  name: CyberneticsPlus
+  contact: Info@cyberneticsplus.com
+tags:
+  - web
+  - security
+severity: info
+variables:
+  - name: email
+    type: string
+    description: The email address to use for testing
+    value: testuser@example.com
+  - name: password
+    type: string
+    description: The password to use for testing
+    value: password
+  - name: new_email
+    type: string
+    description: The new email address to use for testing
+    value: newuser@example.com
+requests:
+  - name: Signup with unique email address
+    method: POST
+    path:
+      - "http://example.com/signup"
+    body:
+      email: "{{email}}"
+      password: "{{password}}"
+    matchers-condition: and
+    matchers:
+      - type: word
+        words:
+          - "Welcome, {{email}}!"
+      - type: status
+        status:
+          - 200
+    execute:
+      - type: http
+        operator: response
+        expression: response.body
+        description: Save response body to a variable
+        variable: response_body
+
+      - type: command
+        command:
+          - "python"
+          - "-c"
+          - |
+            import requests
+
+            # Log the current step
+            print("Testing duplicate registration with different password")
+
+            # Attempt to register with the same email address and different password
+            response = requests.post("http://example.com/signup", data={"email": "{{email}}", "password": "different_password"})
+
+            # Save the response body to a variable
+            response_body = response.text
+
+            assert response.status_code == 400, "Duplicate registration with different password should fail"
+            assert "Email address already in use" in response_body, "Error message not displayed for duplicate registration with different password"
+
+            # Log the result of the test
+            print("Duplicate registration with different password test passed")
+
+  - name: Update existing user email
+    method: POST
+    path:
+      - "http://example.com/update_email"
+    body:
+      email: "{{new_email}}"
+    matchers-condition: and
+    matchers:
+      - type: word
+        words:
+          - "Email address already in use"
+      - type: status
+        status:
+          - 400
+    execute:
+      - type: http
+        operator: response
+        expression: response.body
+        description: Save response body to a variable
+        variable: response_body
+
+      - type: command
+        command:
+          - "python"
+          - "-c"
+          - |
+            import requests
+
+            # Log the current step
+            print("Testing email address update to duplicate email address")
+
+            # Attempt to update the email address associated with the original account to the same email address as the new account
+            response = requests.post("http://example.com/update_email", data={"email": "{{new_email}}"})
+
+            # Save the response body to a variable
+            response_body = response.text
+
+            assert response.status_code == 400, "Updating to a duplicate email address should fail"
+            assert "Email address already in use" in response_body, "Error message not displayed for updating to a duplicate email address"
+
+            # Log the result of the test
+            print("Email address update to duplicate email address test passed")
+
+outputs:
+  - name: Signup Response Body
